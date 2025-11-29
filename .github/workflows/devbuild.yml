@@ -38,4 +38,5 @@ jobs:
           name: ${{ github.ref_name }}
           body: ${{ steps.changelog.outputs.changelog }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "test"
 #
