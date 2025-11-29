@@ -1,0 +1,69 @@
+name: Publish Nightly Build (1.21.1)
+ 
+on:
+  push:
+    branches: ["dev/**"]
+env:
+  TEST_RELEASE_NUM: ${{ vars.TEST_RELEASE_NUM }}
+  JAVA_VERSION: 21
+  MC_VER: 1.21.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print release num
+        run: "echo Release num: ${{ env.TEST_RELEASE_NUM }}"
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get previous tag
+        id: previousTag
+        run: |
+          name=$(git --no-pager tag --sort=creatordate --merged ${{ github.ref_name }} | tail -2 | head -1)
+          echo "previousTag: $name"
+          echo "previousTag=$name" >> $GITHUB_ENV
+
+      - name: Update CHANGELOG
+        id: changelog
+        uses: requarks/changelog-action@v1
+        with:
+          token: ${{ github.token }}
+          fromTag: ${{ github.ref_name }}
+          toTag: ${{ env.previousTag }}
+          writeToFile: false
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.20.0
+        with:
+          allowUpdates: true
+          draft: true
+          makeLatest: true
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.changes }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Increment release count
+        id: get_release_count
+        run: echo "NEW_RELEASE_COUNT=$((${{ env.TEST_RELEASE_NUM }} + 1))" >> $GITHUB_OUTPUT
+
+      - name: "Call API"
+        uses: indiesdev/curl@v1.1
+        with:
+          url: https://api.github.com/repos/filloax/ruins-of-growsseth/actions/variables/TEST_RELEASE_NUM
+          method: "PATCH"
+          headers: '{ 
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28"
+            }'
+          body: '{ "name": "TEST_RELEASE_NUM",  "value": "${{ steps.get_release_count.outputs.NEW_RELEASE_COUNT }}" }'
+          timeout: 3000
+          bearer-token: ${{ secrets.TOKEN_GITHUB }}
+          retries: 3
