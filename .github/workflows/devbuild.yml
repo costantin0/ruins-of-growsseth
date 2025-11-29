@@ -13,21 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print release num
-        run: "echo Release num: ${{ env.TEST_RELEASE_NUM }}"
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build Changelog
-        id: github_release
-        uses: mikepenz/release-changelog-builder-action@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get the changelog
+        run: |
+          cat << "EOF"
+          ${{ steps.changelog.outputs.changelog }}
+          EOF
 
       - name: Create Release
         uses: ncipollo/release-action@v1.20.0
@@ -36,5 +36,5 @@ jobs:
           draft: true
           makeLatest: true
           name: ${{ github.ref_name }}
-          body: ${{ steps.github_release.outputs.changelog }}
+          body: ${{ steps.changelog.outputs.changelog }}
           token: ${{ secrets.GITHUB_TOKEN }}
