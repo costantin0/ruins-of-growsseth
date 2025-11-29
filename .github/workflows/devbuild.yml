@@ -22,34 +22,34 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: ${{ env.JAVA_VERSION }}
+          fetch-depth: 0
 
-      - name: Make Gradle Wrapper Executable
-        if: ${{ runner.os != 'Windows' }}
-        run: chmod +x ./gradlew
+      - name: Get previous tag
+        id: previousTag
+        run: |
+          name=$(git --no-pager tag --sort=creatordate --merged ${{ github.ref_name }} | tail -2 | head -1)
+          echo "previousTag: $name"
+          echo "previousTag=$name" >> $GITHUB_ENV
 
-      - name: Build with Gradle
-        run: ./gradlew build -PmodVersion='${{ env.MC_VER }}-nightly-${{ steps.date.outputs.date }}.${{ env.TEST_RELEASE_NUM }}' -PincludeDeps=true -PreplaceTokens=true
-        env:
-          GROWSSETH_MUSIC_PW: ${{ secrets.MUSIC_PW }}
-
-      - name: "Replace test release"
-        uses: "marvinpinto/action-automatic-releases@latest"
+      - name: Update CHANGELOG
+        id: changelog
+        uses: requarks/changelog-action@v1
         with:
-          repo_token: "${{ secrets.TOKEN_GITHUB }}"
-          automatic_release_tag: "nightly-release-${{ env.MC_VER }}"
-          prerelease: true
-          title: "Nightly build [${{ steps.date.outputs.date }}.${{ env.TEST_RELEASE_NUM }}] - ${{ env.MC_VER }}"
-          files: |
-            base/build/libs/*.jar
-            fabric/build/libs/*.jar
-            neoforge/build/libs/*.jar
-            base/build/datapack/*.zip
+          token: ${{ github.token }}
+          fromTag: ${{ github.ref_name }}
+          toTag: ${{ env.previousTag }}
+          writeToFile: false
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.20.0
+        with:
+          allowUpdates: true
+          draft: true
+          makeLatest: true
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.changes }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Increment release count
         id: get_release_count
